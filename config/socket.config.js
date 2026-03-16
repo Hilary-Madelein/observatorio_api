@@ -6,7 +6,7 @@ module.exports = {
         io = new Server(server, {
             path: '/socket.io',
             cors: {
-                origin: "http://localhost:3000",
+                origin: "https://observatorio-web.vercel.app/",
                 methods: ["GET", "POST"],
                 credentials: true
             }

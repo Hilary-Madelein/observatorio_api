@@ -40,7 +40,7 @@ class EmailService {
                             <li>Al menos un carácter especial</li>
                         </ul>
                         <div style="text-align: center; margin-top: 30px;">
-                            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Iniciar Sesión</a>
+                            <a href="${process.env.FRONTEND_URL || 'https://observatorio-web.vercel.app'}/admin" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Iniciar Sesión</a>
                         </div>
                     </div>
                 </div>
