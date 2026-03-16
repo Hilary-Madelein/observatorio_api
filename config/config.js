@@ -13,6 +13,10 @@ module.exports = {
     timezone: '+00:00',
     dialectOptions: {
       useUTC: true,
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
     },
     operatorAliases: false,
   },
@@ -27,6 +31,10 @@ module.exports = {
     timezone: '+00:00',
     dialectOptions: {
       useUTC: true,
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
     },
     operatorAliases: false,
   },

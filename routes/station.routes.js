@@ -26,7 +26,7 @@ router.get('/listar/estacion/operativas', stationController.listActive);
 router.get('/listar/estacion/:estado/:external_id', auth(), stationController.listByMicrobasinAndStatus);
 router.get('/obtener/estacion/:external', auth(), stationController.getByMicrobasinParam);
 router.get('/get/estacion/:external_id', auth(), stationController.getByExternal);
-router.post('/estaciones/operativas/microcuenca', auth(), stationController.getByMicrobasinBody);
+router.post('/estaciones/operativas/microcuenca', stationController.getByMicrobasinBody);
 router.post('/estacion/cambiar_estado', auth(), stationController.changeStatus);
 router.post('/estaciones/vincular', auth(), stationController.linkToMicrobasin);
 router.post('/estaciones/desvincular', auth(), stationController.unlinkFromMicrobasin);
