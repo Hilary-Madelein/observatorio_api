@@ -1,0 +1,8 @@
+/.env
+/.env.test
+/node_modules
+**/node_modules/
+**/.cache/
+Dockerfile*
+/public/images
+public/data
