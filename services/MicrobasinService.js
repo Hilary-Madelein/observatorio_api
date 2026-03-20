@@ -331,8 +331,7 @@ class MicrobasinService {
                 include: [{
                     model: Microbasin,
                     as: 'microbasins',
-                    where: { id: microbasin.id },
-                    attributes: []
+                    where: { id: microbasin.id }
                 }],
                 where: {
                     status: 'OPERATIVA'

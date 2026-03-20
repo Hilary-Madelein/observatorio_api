@@ -71,6 +71,7 @@ class StationService {
                 'app_user',
                 ['description_en', 'description_en']
             ],
+            order: [['alias', 'ASC']]
         });
     }
 

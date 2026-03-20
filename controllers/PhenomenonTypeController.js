@@ -58,6 +58,17 @@ class PhenomenonTypeController {
         }
     }
 
+    async getActiveVariablesWithOperationalStations(req, res) {
+        try {
+            const info = await PhenomenonTypeService.getActiveVariablesWithOperationalStations();
+            return res.status(200).json({ msg: 'Variables operativas', code: 200, info });
+        } catch (error) {
+            console.error(error);
+            const sanitized = ErrorSanitizer.sanitize(error);
+            return res.status(sanitized.code).json(sanitized);
+        }
+    }
+
     async getVariablesByStation(req, res) {
         const externalId = req.params.external_id;
         if (!externalId) return res.status(400).json({ msg: 'Falta external_id', code: 400 });

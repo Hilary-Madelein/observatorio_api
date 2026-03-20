@@ -21,6 +21,7 @@ router.put('/modificar/tipo_medida', auth(), uploadIconoEstacion.single('foto'),
 router.get('/listar/tipo_medida', auth({ required: false }), phenomenonTypeController.list);
 router.get('/listar/operaciones', phenomenonTypeController.listOperations);
 router.get('/listar/tipo_medida/activas', phenomenonTypeController.getActiveVariables);
+router.get('/listar/tipo_medida/operativas', phenomenonTypeController.getActiveVariablesWithOperationalStations);
 router.get('/listar/tipo_medida/estacion/:external_id', phenomenonTypeController.getVariablesByStation);
 router.get('/listar/tipo_medida/desactivos', auth(), phenomenonTypeController.listFalse);
 router.get('/obtener/tipo_medida/:external', auth(), phenomenonTypeController.get);

@@ -114,8 +114,44 @@ class PhenomenonTypeService {
         const results = await PhenomenonType.findAll({
             where: { status: true },
             attributes: ['icon', 'unit_measure', 'external_id', 'status', 'name_en', 'alias'],
+            order: [['alias', 'ASC']]
         });
+
         return results.map(f => ({
+            nombre: f.alias,
+            alias_es: f.alias,
+            alias_en: f.name_en,
+            icono: f.icon,
+            unidad: f.unit_measure,
+            external_id: f.external_id,
+        }));
+    }
+
+    async getActiveVariablesWithOperationalStations() {
+        const results = await PhenomenonType.findAll({
+            where: { status: true },
+            attributes: ['icon', 'unit_measure', 'external_id', 'status', 'name_en', 'alias'],
+            include: [
+                {
+                    model: models.station,
+                    as: 'stations',
+                    where: { status: 'OPERATIVA' },
+                    attributes: []
+                }
+            ],
+            order: [['alias', 'ASC']]
+        });
+
+        const uniqueResults = [];
+        const seen = new Set();
+        for (const f of results) {
+            if (!seen.has(f.external_id)) {
+                seen.add(f.external_id);
+                uniqueResults.push(f);
+            }
+        }
+
+        return uniqueResults.map(f => ({
             nombre: f.alias,
             alias_es: f.alias,
             alias_en: f.name_en,
@@ -335,7 +371,11 @@ class PhenomenonTypeService {
 
             if (phenomenon.status === true) {
                 const activeStations = await phenomenon.getStations({
-                    where: { status: 'OPERATIVA' },
+                    where: { 
+                        status: {
+                            [Op.in]: ['OPERATIVA', 'MANTENIMIENTO']
+                        }
+                    },
                     include: [
                         {
                             model: models.microbasin,
@@ -352,12 +392,12 @@ class PhenomenonTypeService {
                         const investigatorName = s.microbasin && s.microbasin.investigator
                             ? `${s.microbasin.investigator.name} ${s.microbasin.investigator.lastname}`
                             : 'Desconocido';
-                        return `• ${s.alias} (Registrada por: ${investigatorName})`;
+                        return `• ${s.alias} (Estado: ${s.status})`;
                     }).join('\n');
 
                     const more = activeStations.length > 3 ? `\n... y ${activeStations.length - 3} más.` : '';
 
-                    const error = new Error(`No se puede desactivar la variable porque está siendo usada por las siguientes estaciones operativas:\n${details}${more}`);
+                    const error = new Error(`No se puede desactivar la variable porque está vinculada a estaciones operativas o en mantenimiento:\n${details}${more}`);
                     error.code = 400;
                     throw error;
                 }
