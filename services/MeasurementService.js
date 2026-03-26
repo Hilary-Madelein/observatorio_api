@@ -69,6 +69,26 @@ class MeasurementService {
         const fechaDate = new Date(fecha);
         const quantities = [];
         const measurementsMeta = [];
+        let valor_rain = 0;
+
+        const fLluvia = phenomByKey.get('rain_mm');
+
+        if (!fLluvia) {
+            console.warn("No se encontró un tipo de fenómeno configurado para 'rain_mm'");
+        }
+
+        const idLluvia = fLluvia ? fLluvia.id : null;
+
+        const lastRainMeasurement = idLluvia ? await Measurement.findOne({
+            where: {
+                id_station: station.id,
+                id_phenomenon_type: idLluvia
+            },
+            include: [{ model: Quantity, as: 'quantity' }],
+            order: [['local_date', 'DESC']]
+        }) : null;
+
+        let valorAnterior = lastRainMeasurement ? parseFloat(lastRainMeasurement.quantity.quantity) : 0;
 
         for (const [variable, rawValue] of Object.entries(payload)) {
             let valor = parseFloat(rawValue);
@@ -76,6 +96,15 @@ class MeasurementService {
 
             if (variable === 'Nivel_de_agua') {
                 valor += 2200;
+            }
+
+            if (variable === 'rain_mm') {
+                if (valor >= valorAnterior) {
+                    valor_rain = valor - valorAnterior;
+                } else {
+                    valor_rain = valor;
+                }
+                valor = valor_rain;
             }
 
             if (!EXEMPT_VARS.has(variable.toLowerCase()) && valor > MAX_ANOMALO) {
