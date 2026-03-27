@@ -33,17 +33,20 @@ jobs:
       - name: Run tests
         run: |
           set -euo pipefail
-          node - <<'NODE'
+          SHOULD_RUN_TESTS="$(node - <<'NODE'
           const pkg = require('./package.json');
           const test = (pkg.scripts && pkg.scripts.test) ? String(pkg.scripts.test) : '';
           const isPlaceholder = /no test specified/i.test(test) && /exit\s+1/.test(test);
-          if (isPlaceholder) {
-            console.log('Skipping placeholder tests (no test specified).');
-            process.exit(0);
-          }
-          console.log('Running npm test...');
+          process.stdout.write(isPlaceholder ? '0' : '1');
           NODE
-          npm test
+          )"
+
+          if [ "${SHOULD_RUN_TESTS}" = "1" ]; then
+            echo "Running npm test..."
+            npm test
+          else
+            echo "Skipping placeholder tests (no test specified)."
+          fi
 
       # Subir resultados de pruebas como artefacto
       - name: Upload Test Results
