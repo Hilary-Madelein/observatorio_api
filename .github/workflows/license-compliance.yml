@@ -57,7 +57,7 @@ jobs:
       # Subir reporte de licencias como artefacto
       - name: Upload License Report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: license-compliance-report
           path: license_report.json

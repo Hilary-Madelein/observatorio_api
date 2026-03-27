@@ -51,7 +51,7 @@ jobs:
           npx eslint . --format json -o eslint-results.json || true
 
       - name: Upload ESLint JSON
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: eslint-results-json
           path: eslint-results.json
