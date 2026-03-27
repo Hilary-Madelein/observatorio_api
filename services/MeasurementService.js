@@ -11,6 +11,7 @@ const Measurement = models.measurement;
 const PhenomenonType = models.phenomenon_type;
 const DailyMeasurement = models.daily_measurement;
 const TypeOperation = models.type_operation;
+const VariableState = models.variable_state;
 
 const GRANULAR_WINDOW_DAYS = 3;
 
@@ -44,9 +45,32 @@ class MeasurementService {
      * Logic for processing TTN payload
      */
     async processTTNPayload(fecha, dispositivo, payload) {
-        const station = await Station.findOne({ where: { id_device: dispositivo } });
+        const station = await Station.findOne({ 
+            where: { id_device: dispositivo },
+            include: [{
+                model: models.phenomenon_type,
+                as: 'phenomenon_types',
+                through: { attributes: ['cumulative_keys'] }
+            }]
+        });
+
         if (!station) {
             throw new Error('Estación no encontrada');
+        }
+
+        const phenomByKey = new Map();
+        const cumulativeKeys = new Set();
+
+        if (station.phenomenon_types) {
+            for (const ph of station.phenomenon_types) {
+                for (const key of (ph.ttn_keys || [])) {
+                    phenomByKey.set(key.toLowerCase(), ph);
+                }
+                const pivot = ph.station_phenomenon_type;
+                if (pivot && Array.isArray(pivot.cumulative_keys)) {
+                    pivot.cumulative_keys.forEach(k => cumulativeKeys.add(k.toLowerCase()));
+                }
+            }
         }
 
         const MAX_ANOMALO = 50000;
@@ -57,61 +81,39 @@ class MeasurementService {
             'caudal (l/s)'
         ]);
 
-        const allPhenomena = await PhenomenonType.findAll({ where: { status: true } });
-
-        const phenomByKey = new Map();
-        for (const ph of allPhenomena) {
-            for (const key of (ph.ttn_keys || [])) {
-                phenomByKey.set(key.toLowerCase(), ph);
-            }
-        }
-
         const fechaDate = new Date(fecha);
         const quantities = [];
-        const measurementsMeta = [];
-        let valor_rain = 0;
 
-        const fLluvia = phenomByKey.get('rain_mm');
-
-        if (!fLluvia) {
-            console.warn("No se encontró un tipo de fenómeno configurado para 'rain_mm'");
-        }
-
-        const idLluvia = fLluvia ? fLluvia.id : null;
-
-        const lastRainMeasurement = idLluvia ? await Measurement.findOne({
-            where: {
-                id_station: station.id,
-                id_phenomenon_type: idLluvia
-            },
-            include: [{ model: Quantity, as: 'quantity' }],
-            order: [['local_date', 'DESC']]
-        }) : null;
-
-        let valorAnterior = lastRainMeasurement ? parseFloat(lastRainMeasurement.quantity.quantity) : 0;
-
-        for (const [variable, rawValue] of Object.entries(payload)) {
+        for (let [variable, rawValue] of Object.entries(payload)) {
             let valor = parseFloat(rawValue);
             if (isNaN(valor)) continue;
 
-            if (variable === 'Nivel_de_agua') {
+            const varKeyLowerCase = variable.toLowerCase();
+
+            if (varKeyLowerCase === 'nivel_de_agua') {
                 valor += 2200;
             }
 
-            if (variable === 'rain_mm') {
-                if (valor >= valorAnterior) {
-                    valor_rain = valor - valorAnterior;
-                } else {
-                    valor_rain = valor;
+            if (cumulativeKeys.has(varKeyLowerCase)) {
+                const [state, created] = await VariableState.findOrCreate({
+                    where: { id_station: station.id, key: variable },
+                    defaults: { last_value: valor }
+                });
+
+                let delta = 0;
+                if (!created) {
+                    const valorAnterior = parseFloat(state.last_value);
+                    delta = (valor >= valorAnterior) ? (valor - valorAnterior) : valor;
+                    await state.update({ last_value: valor });
                 }
-                valor = valor_rain;
+                valor = delta;
             }
 
-            if (!EXEMPT_VARS.has(variable.toLowerCase()) && valor > MAX_ANOMALO) {
+            if (!EXEMPT_VARS.has(varKeyLowerCase) && valor > MAX_ANOMALO) {
                 continue;
             }
 
-            const phenomenon = phenomByKey.get(variable.toLowerCase());
+            const phenomenon = phenomByKey.get(varKeyLowerCase);
             if (!phenomenon) continue;
 
             quantities.push({
@@ -131,29 +133,29 @@ class MeasurementService {
 
         const measurementsToInsert = createdQuantities.map((q, i) => ({
             local_date: fechaDate,
+            external_id: uuidv4(),
+            status: true,
             id_station: station.id,
             id_quantity: q.id,
-            id_phenomenon_type: quantities[i]._phenomenonId,
-            external_id: uuidv4(),
-            status: true
+            id_phenomenon_type: quantities[i]._phenomenonId
         }));
 
         await Measurement.bulkCreate(measurementsToInsert);
 
-        const savedMeasurements = quantities.map((meta, i) => ({
-            tipo_medida: meta._variable,
-            valor: meta.quantity,
-            unidad: meta._unit,
+        const savedMeasurementsForSocket = quantities.map((q, i) => ({
+            tipo_medida: q._variable,
+            valor: q.quantity,
+            unidad: q._unit,
             estacion: dispositivo
         }));
 
         try {
-            getIO().emit('new-measurements', savedMeasurements);
+            getIO().emit('new-measurements', savedMeasurementsForSocket);
         } catch (err) {
             console.warn('Socket no disponible:', err.message);
         }
 
-        return savedMeasurements;
+        return savedMeasurementsForSocket;
     }
 
     /**

@@ -61,7 +61,7 @@ class StationService {
                 'external_id',
                 'name',
                 'alias',
-                ['name_en', 'alias_en'],
+                'name_en',
                 'picture',
                 'longitude',
                 'latitude',
@@ -69,7 +69,8 @@ class StationService {
                 'type',
                 'id_device',
                 'app_user',
-                ['description_en', 'description_en']
+                'description',
+                'description_en'
             ],
             order: [['alias', 'ASC']]
         });
@@ -207,8 +208,8 @@ class StationService {
                 {
                     model: models.phenomenon_type,
                     as: 'phenomenon_types',
-                    attributes: ['external_id', 'name_en', 'alias', 'unit_measure', 'icon'],
-                    through: { attributes: [] }
+                    attributes: ['external_id', 'name_en', 'alias', 'unit_measure', 'icon', 'ttn_keys'],
+                    through: { attributes: ['cumulative_keys'] }
                 }
             ]
         });
@@ -258,11 +259,18 @@ class StationService {
             await station.addMicrobasin(microbasin, { transaction });
 
             if (data.phenomenon_ids) {
-                const phenomena = await models.phenomenon_type.findAll({
-                    where: { external_id: data.phenomenon_ids },
-                    transaction
-                });
-                await station.setPhenomenon_types(phenomena, { transaction });
+                for (const item of data.phenomenon_ids) {
+                    const p = await models.phenomenon_type.findOne({
+                        where: { external_id: item.external_id },
+                        transaction
+                    });
+                    if (p) {
+                        await station.addPhenomenon_type(p, {
+                            through: { cumulative_keys: item.cumulative_keys || [] },
+                            transaction
+                        });
+                    }
+                }
             }
 
             // TRIGGER MQTT RELOAD
@@ -332,15 +340,26 @@ class StationService {
             station.app_user = data.app_user;
             station.picture = newPicture;
             station.external_id = uuid.v4();
-            
+
             await station.save({ transaction });
 
             if (data.phenomenon_ids) {
-                const phenomena = await models.phenomenon_type.findAll({
-                    where: { external_id: data.phenomenon_ids },
+                await models.station_phenomenon_type.destroy({
+                    where: { id_station: station.id },
                     transaction
                 });
-                await station.setPhenomenon_types(phenomena, { transaction });
+                for (const item of data.phenomenon_ids) {
+                    const p = await models.phenomenon_type.findOne({
+                        where: { external_id: item.external_id },
+                        transaction
+                    });
+                    if (p) {
+                        await station.addPhenomenon_type(p, {
+                            through: { cumulative_keys: item.cumulative_keys || [] },
+                            transaction
+                        });
+                    }
+                }
             }
             if (data.id_microcuenca) {
                 let mIds = [];

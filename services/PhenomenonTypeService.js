@@ -113,7 +113,7 @@ class PhenomenonTypeService {
     async getActiveVariables() {
         const results = await PhenomenonType.findAll({
             where: { status: true },
-            attributes: ['icon', 'unit_measure', 'external_id', 'status', 'name_en', 'alias'],
+            attributes: ['icon', 'unit_measure', 'external_id', 'status', 'name_en', 'alias', 'ttn_keys'],
             order: [['alias', 'ASC']]
         });
 
@@ -124,13 +124,14 @@ class PhenomenonTypeService {
             icono: f.icon,
             unidad: f.unit_measure,
             external_id: f.external_id,
+            ttn_keys: f.ttn_keys || []
         }));
     }
 
     async getActiveVariablesWithOperationalStations() {
         const results = await PhenomenonType.findAll({
             where: { status: true },
-            attributes: ['icon', 'unit_measure', 'external_id', 'status', 'name_en', 'alias'],
+            attributes: ['icon', 'unit_measure', 'external_id', 'status', 'name_en', 'alias', 'ttn_keys'],
             include: [
                 {
                     model: models.station,
@@ -158,6 +159,7 @@ class PhenomenonTypeService {
             icono: f.icon,
             unidad: f.unit_measure,
             external_id: f.external_id,
+            ttn_keys: f.ttn_keys || []
         }));
     }
 
