@@ -9,9 +9,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 var createError = require('http-errors');
 var app = express();
-const { CronJob } = require('cron');
-const MeasurementController = require('./controllers/MeasurementController');
-const measurementCtrl = new MeasurementController();
+const { startDailyMaintenanceCron } = require('./jobs/daily_maintenance.cron');
+const { startKeepAliveCron } = require('./jobs/keepalive.cron');
 const MqttService = require('./services/MqttService');
 
 // Inicializar servicio MQTT
@@ -30,30 +29,11 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors({ origin: '*' }));
 
-const expression = '0 0 0 * * *';
+// Cron diario (configurable via env: DAILY_MAINTENANCE_CRON, CRON_TZ, ENABLE_CRON)
+startDailyMaintenanceCron();
 
-new CronJob(
-  expression,
-  async () => {
-    const fakeReq = {};
-    const fakeRes = {
-      status: (code) => ({ json: body => console.log('[Cron]', code, body) })
-    };
-
-    try {
-      await measurementCtrl.migrateToDaily(fakeReq, fakeRes);
-      console.log('[Cron] Migración a daily completada.');
-
-      await measurementCtrl.cleanOldMeasurements(fakeReq, fakeRes);
-      console.log('[Cron] Eliminación de measurements antiguos completa.');
-    } catch (err) {
-      console.error('[Cron] Error en tareas programadas:', err);
-    }
-  },
-  null,
-  true,
-  'America/Guayaquil'
-);
+// Keep-alive (configurable via env: KEEPALIVE_URL, KEEPALIVE_CRON, CRON_TZ, ENABLE_KEEPALIVE_CRON)
+startKeepAliveCron();
 
 
 // Mount routes
