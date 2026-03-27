@@ -29,9 +29,21 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Ejecutar las pruebas
+      # Ejecutar las pruebas (si no es el script placeholder)
       - name: Run tests
-        run: npm test
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const pkg = require('./package.json');
+          const test = (pkg.scripts && pkg.scripts.test) ? String(pkg.scripts.test) : '';
+          const isPlaceholder = /no test specified/i.test(test) && /exit\s+1/.test(test);
+          if (isPlaceholder) {
+            console.log('Skipping placeholder tests (no test specified).');
+            process.exit(0);
+          }
+          console.log('Running npm test...');
+          NODE
+          npm test
 
       # Subir resultados de pruebas como artefacto
       - name: Upload Test Results
@@ -39,4 +51,5 @@ jobs:
         with:
           name: Test-Results
           path: test-results
+          if-no-files-found: warn
 
