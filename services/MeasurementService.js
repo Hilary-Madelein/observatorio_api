@@ -15,6 +15,52 @@ const VariableState = models.variable_state;
 
 const GRANULAR_WINDOW_DAYS = 3;
 
+// Fallback en memoria para estados acumulativos si `variable_state` no está disponible
+// (p.ej., tabla no creada en BD). Evita que el backend se caiga.
+const inMemoryCumulativeState = new Map();
+
+function parseAlwaysCumulativeKeys() {
+    const raw = process.env.ALWAYS_CUMULATIVE_KEYS;
+    // Por defecto solo `rain_mm` para cubrir el caso solicitado.
+    const value = (raw == null || String(raw).trim() === '') ? 'rain_mm' : String(raw);
+    return new Set(
+        value
+            .split(',')
+            .map(s => s.trim().toLowerCase())
+            .filter(Boolean)
+    );
+}
+
+async function computeDeltaForCumulativeKey({ stationId, keyLowerCase, value }) {
+    if (!keyLowerCase) return value;
+
+    // Preferir persistencia en BD si el modelo existe
+    if (VariableState && typeof VariableState.findOrCreate === 'function') {
+        try {
+            const [state, created] = await VariableState.findOrCreate({
+                where: { id_station: stationId, key: keyLowerCase },
+                defaults: { last_value: value }
+            });
+
+            if (created) return value;
+
+            const previousValue = parseFloat(state.last_value);
+            const delta = (value >= previousValue) ? (value - previousValue) : value;
+            await state.update({ last_value: value });
+            return delta;
+        } catch (err) {
+            // Si la tabla no existe o hay error de BD, caer a memoria
+            console.warn('[Cumulative] variable_state no disponible, usando fallback en memoria:', err.message);
+        }
+    }
+
+    const mapKey = `${stationId}:${keyLowerCase}`;
+    const previous = inMemoryCumulativeState.get(mapKey);
+    inMemoryCumulativeState.set(mapKey, value);
+    if (previous == null) return value;
+    return (value >= previous) ? (value - previous) : value;
+}
+
 class MeasurementService {
 
     /**
@@ -60,6 +106,7 @@ class MeasurementService {
 
         const phenomByKey = new Map();
         const cumulativeKeys = new Set();
+        const alwaysCumulativeKeys = parseAlwaysCumulativeKeys();
 
         if (station.phenomenon_types) {
             for (const ph of station.phenomenon_types) {
@@ -94,19 +141,12 @@ class MeasurementService {
                 valor += 2200;
             }
 
-            if (cumulativeKeys.has(varKeyLowerCase)) {
-                const [state, created] = await VariableState.findOrCreate({
-                    where: { id_station: station.id, key: variable },
-                    defaults: { last_value: valor }
+            if (cumulativeKeys.has(varKeyLowerCase) || alwaysCumulativeKeys.has(varKeyLowerCase)) {
+                valor = await computeDeltaForCumulativeKey({
+                    stationId: station.id,
+                    keyLowerCase: varKeyLowerCase,
+                    value: valor
                 });
-
-                let delta = 0;
-                if (!created) {
-                    const valorAnterior = parseFloat(state.last_value);
-                    delta = (valor >= valorAnterior) ? (valor - valorAnterior) : valor;
-                    await state.update({ last_value: valor });
-                }
-                valor = delta;
             }
 
             if (!EXEMPT_VARS.has(varKeyLowerCase) && valor > MAX_ANOMALO) {
